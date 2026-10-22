@@ -1,0 +1,27 @@
+apply plugin: 'base'
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds the Forge and NeoForge variants sequentially.'
+    dependsOn ':forge1201:build', ':neoforge:build'
+    project(':neoforge').tasks.named('build').configure { mustRunAfter ':forge1201:build' }
+}
+
+tasks.register('verifyAll') {
+    group = 'verification'
+    description = 'Runs available verification tasks for both loaders.'
+    dependsOn ':forge1201:check', ':neoforge:check'
+    project(':neoforge').tasks.named('check').configure { mustRunAfter ':forge1201:check' }
+}
+
+tasks.register('runForgeClient') { dependsOn ':forge1201:runClient' }
+tasks.register('runNeoForgeClient') { dependsOn ':neoforge:runClient' }
+tasks.register('runClient') { dependsOn 'runNeoForgeClient' }
+tasks.register('runForgeServer') { dependsOn ':forge1201:runServer' }
+tasks.register('runNeoForgeServer') { dependsOn ':neoforge:runServer' }
+tasks.register('runServer') { dependsOn 'runNeoForgeServer' }
+tasks.register('runForgeGameTests') { dependsOn ':forge1201:runGameTestServer' }
+tasks.register('runNeoForgeGameTests') { dependsOn ':neoforge:runGameTestServer' }
+
+tasks.named('build').configure { dependsOn 'buildAll' }
+tasks.named('check').configure { dependsOn 'verifyAll' }

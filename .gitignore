@@ -1,0 +1,13 @@
+.gradle/
+.gradle-cache/
+.gradle-create-on-demand/
+build/
+runs/
+.idea/
+*.iml
+out/
+
+forge1201/runs/
+neoforge/runs/
+forge1201/build/
+neoforge/build/

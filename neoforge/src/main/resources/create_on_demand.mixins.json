@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.radaeli.createondemand.neoforge.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "DemandGaugeMixin",
+    "DemandArrivalMixin"
+  ],
+  "client": [
+    "DemandGaugeScreenMixin",
+    "DemandStockKeeperMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

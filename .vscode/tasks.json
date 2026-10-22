@@ -1,0 +1,34 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Create: On Demand: Build All",
+      "type": "process",
+      "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["--no-daemon", "--no-parallel", "buildAll", "--console=plain"],
+      "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}},
+      "group": {"kind": "build", "isDefault": true},
+      "problemMatcher": "$gradle",
+      "presentation": {"reveal": "always", "panel": "dedicated", "clear": true}
+    },
+    {
+      "label": "Create: On Demand: Build Forge",
+      "type": "process", "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["--no-daemon", "--no-parallel", ":forge1201:build", "--console=plain"],
+      "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}},
+      "problemMatcher": "$gradle"
+    },
+    {
+      "label": "Create: On Demand: Build NeoForge",
+      "type": "process", "command": "${workspaceFolder}\\gradlew.bat",
+      "args": ["--no-daemon", "--no-parallel", ":neoforge:build", "--console=plain"],
+      "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}},
+      "problemMatcher": "$gradle"
+    },
+    {"label": "Create: On Demand: Run Forge Client", "type": "process", "command": "${workspaceFolder}\\gradlew.bat", "args": ["--no-daemon", "--no-parallel", "runForgeClient", "--console=plain"], "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}}, "problemMatcher": "$gradle", "group": "test"},
+    {"label": "Create: On Demand: Run NeoForge Client", "type": "process", "command": "${workspaceFolder}\\gradlew.bat", "args": ["--no-daemon", "--no-parallel", "runNeoForgeClient", "--console=plain"], "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}}, "problemMatcher": "$gradle", "group": "test"},
+    {"label": "Create: On Demand: Run Forge Server", "type": "process", "command": "${workspaceFolder}\\gradlew.bat", "args": ["--no-daemon", "--no-parallel", "runForgeServer", "--console=plain"], "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}}, "problemMatcher": "$gradle"},
+    {"label": "Create: On Demand: Run NeoForge Server", "type": "process", "command": "${workspaceFolder}\\gradlew.bat", "args": ["--no-daemon", "--no-parallel", "runNeoForgeServer", "--console=plain"], "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}}, "problemMatcher": "$gradle"},
+    {"label": "Create: On Demand: Verify All", "type": "process", "command": "${workspaceFolder}\\gradlew.bat", "args": ["--no-daemon", "--no-parallel", "verifyAll", "--console=plain"], "options": {"cwd": "${workspaceFolder}", "env": {"GRADLE_USER_HOME": "${workspaceFolder}\\.gradle-create-on-demand"}}, "problemMatcher": "$gradle"}
+  ]
+}
