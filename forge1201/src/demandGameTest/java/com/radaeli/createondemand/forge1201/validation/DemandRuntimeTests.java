@@ -49,6 +49,14 @@ public final class DemandRuntimeTests {
     public static void ordersWaitForNativePromises(GameTestHelper helper) {
         production(helper, false, 1, Mode.ORDERS, true);
     }
+    @GameTest(template = "demand_empty", batch = "addressed_production", timeoutTicks = 1000)
+    public static void addressedProductionShipsExactQuantity(GameTestHelper helper) {
+        production(helper, false, 1, null, false, "Home");
+    }
+    @GameTest(template = "demand_empty", batch = "addressed_chain", timeoutTicks = 1000)
+    public static void addressedChainShipsOnlyFinalProduct(GameTestHelper helper) {
+        production(helper, true, 1, null, false, "Workshop");
+    }
     private static void production(GameTestHelper helper, boolean chain, int dimension) {
         production(helper, chain, dimension, null);
     }
@@ -56,12 +64,15 @@ public final class DemandRuntimeTests {
         production(helper, chain, dimension, stockMode, false);
     }
     private static void production(GameTestHelper helper, boolean chain, int dimension, Mode stockMode, boolean queueEarly) {
+        production(helper, chain, dimension, stockMode, queueEarly, "");
+    }
+    private static void production(GameTestHelper helper, boolean chain, int dimension, Mode stockMode, boolean queueEarly, String address) {
         var level = helper.getLevel(); UUID network = UUID.randomUUID();
         BlockPos base = helper.absolutePos(new BlockPos(1, 2, 1));
         BlockPos sourcePos = base, sourceBox = base.north(), crafterPos = base.east(4);
         BlockPos resultPos = crafterPos.relative(Direction.WEST), resultBox = resultPos.south(), receivingBox = crafterPos.south();
         level.setBlockAndUpdate(sourcePos, Blocks.CHEST.defaultBlockState());
-        ((ChestBlockEntity) level.getBlockEntity(sourcePos)).setItem(0, new ItemStack(Items.OAK_LOG, stockMode == null ? 1 : 6));
+        ((ChestBlockEntity) level.getBlockEntity(sourcePos)).setItem(0, new ItemStack(Items.OAK_LOG, stockMode == null ? (!address.isEmpty() && !chain ? 2 : 1) : 6));
         PackagerBlockEntity source = packager(helper, sourceBox, Direction.NORTH);
         link(helper, sourceBox.above(), network);
         level.setBlockAndUpdate(resultPos, Blocks.CHEST.defaultBlockState());
@@ -138,7 +149,7 @@ public final class DemandRuntimeTests {
                         "Serialized preview keeps the component before the final product, including surplus");
             }
             if (stockMode == null || queueEarly)
-                order[0] = service.engine.submit(UUID.randomUUID(), ((DemandGauge) root).demandId(), chain ? 1 : 4);
+                order[0] = service.engine.submit(UUID.randomUUID(), ((DemandGauge) root).demandId(), chain ? 1 : address.isEmpty() ? 4 : 5, address);
         });
         helper.onEachTick(() -> {
             helper.assertTrue(level.getBlockEntity(crafterPos) == crafter, "Crafter replaced before tick: " + level.getBlockState(crafterPos) + " current=" + level.getBlockEntity(crafterPos));
@@ -192,6 +203,18 @@ public final class DemandRuntimeTests {
                 } else settled[0] = 0;
                 return;
             }
+            if (!address.isEmpty() && order[0] != null && order[0].state == State.SHIPPED) {
+                helper.assertTrue(unpacked[0], "Addressed production used the real crafting path");
+                helper.assertTrue(!service.engine.orders.contains(order[0]), "Only fully packaged orders leave the queue");
+                int packed = packagedCount(helper, finalPackager, address, chain ? Items.OAK_BUTTON : Items.OAK_PLANKS);
+                helper.assertTrue(packed == (chain ? 1 : 5) && order[0].packaged == packed, "Exactly the requested final products are addressed");
+                var storage = (ChestBlockEntity) level.getBlockEntity(chain ? finalPos : resultPos);
+                int count = 0;
+                for (int slot = 0; slot < storage.getContainerSize(); slot++)
+                    if (storage.getItem(slot).is(chain ? Items.OAK_BUTTON : Items.OAK_PLANKS)) count += storage.getItem(slot).getCount();
+                helper.assertTrue(count == (chain ? 0 : 3), "Rounded batch surplus stays in storage");
+                helper.succeed();
+            }
             if (order[0] != null && order[0].state == State.COMPLETED) {
                 helper.assertTrue(unpacked[0], "Production used the package's crafting context");
                 helper.assertTrue(!service.engine.orders.contains(order[0]), "The returned order is automatically cleared from the queue");
@@ -206,10 +229,79 @@ public final class DemandRuntimeTests {
             }
         });
         helper.runAtTickTime(chain ? 950 : 550, () -> {
-            if (stockMode == null && order[0] != null && order[0].state != State.COMPLETED) helper.fail("Production stalled: " + order[0].state + "/" + order[0].reason
+            if (stockMode == null && order[0] != null && order[0].state != State.COMPLETED && order[0].state != State.SHIPPED) helper.fail("Production stalled: " + order[0].state + "/" + order[0].reason
                     + " sent=" + order[0].sent + " received=" + order[0].received + " unpacked=" + unpacked[0]
                     + " sourceBox=" + source.heldBox + " resultBox=" + result.heldBox
                     + " crafter=" + crafter.getInventory().getStackInSlot(0) + " target=" + crafter.getTargetDirection());
+        });
+    }
+    private static int packagedCount(GameTestHelper helper, PackagerBlockEntity packager, String address, Item item) {
+        List<ItemStack> boxes = new ArrayList<>();
+        if (!packager.heldBox.isEmpty()) boxes.add(packager.heldBox);
+        for (var queued : packager.queuedExitingPackages) {
+            helper.assertTrue(queued.count == 1, "Each queued box is counted once"); boxes.add(queued.stack);
+        }
+        int count = 0;
+        for (ItemStack box : boxes) {
+            helper.assertTrue(PackageItem.getAddress(box).equals(address), "Every box uses the saved destination");
+            var contents = PackageItem.getContents(box);
+            for (int slot = 0; slot < contents.getSlots(); slot++) {
+                ItemStack stack = contents.getStackInSlot(slot);
+                helper.assertTrue(stack.isEmpty() || stack.is(item), "Packages contain only final products");
+                count += stack.getCount();
+            }
+        }
+        return count;
+    }
+    @GameTest(template = "demand_empty", batch = "addressed_packages", timeoutTicks = 240)
+    public static void addressedMultiplePackagersWaitAndResume(GameTestHelper helper) {
+        var level = helper.getLevel(); UUID network = UUID.randomUUID(), root = UUID.randomUUID();
+        DemandService service = DemandService.get(level.getServer());
+        Key output = service.key(network, new ItemStack(Items.OAK_PLANKS));
+        Recipe recipe = new Recipe(root, output, 4, Mode.ORDERS,
+                List.of(new Input(UUID.randomUUID(), service.key(network, new ItemStack(Items.OAK_LOG)), 1)), "test");
+        Order order = new Order(UUID.randomUUID(), UUID.randomUUID(), root, 1200, Map.of(root, recipe), "Large order");
+        order.sent = order.received = 1200; service.engine.orders.add(order);
+        List<PackagerBlockEntity> packagers = new ArrayList<>();
+        List<ChestBlockEntity> chests = new ArrayList<>();
+        helper.runAtTickTime(25, () -> {
+            helper.assertTrue(order.state == State.SHIPPING && order.packaged == 0,
+                    "Fully returned output waits for storage and Packagers without producer chunks");
+            for (int i = 0; i < 2; i++) {
+                BlockPos pos = helper.absolutePos(new BlockPos(1 + i * 5, 2, 1));
+                level.setBlockAndUpdate(pos, Blocks.CHEST.defaultBlockState());
+                ChestBlockEntity chest = (ChestBlockEntity) level.getBlockEntity(pos); chests.add(chest);
+                for (int slot = 0; slot < 11; slot++) chest.setItem(slot, new ItemStack(Items.OAK_PLANKS, 64));
+                PackagerBlockEntity packager = packager(helper, pos.south(), Direction.SOUTH); packagers.add(packager);
+                link(helper, pos.south().above(), network);
+            }
+            LogisticsManager.ACCURATE_SUMMARIES.invalidateAll(); LogisticsManager.SUMMARIES.invalidateAll();
+        });
+        helper.runAtTickTime(26, () -> {
+            // Explicitly register links so this preflight test does not depend on their next lazy tick.
+            for (PackagerBlockEntity packager : packagers) {
+                var link = (PackagerLinkBlockEntity) level.getBlockEntity(packager.getBlockPos().above());
+                LogisticallyLinkedBehaviour.keepAlive(link.behaviour);
+            }
+            LogisticsManager.ACCURATE_SUMMARIES.invalidateAll(); LogisticsManager.SUMMARIES.invalidateAll();
+            PackagerBlockEntity busy = packagers.get(0);
+            for (int i = 0; i < 51; i++) busy.queuedExitingPackages.add(new com.simibubi.create.content.logistics.BigItemStack(
+                    PackageItem.containing(List.of(new ItemStack(Items.STONE))), 1));
+            helper.assertTrue(service.ship(order, order.quantity) == 0, "A busy Packager prevents an incomplete multi-inventory shipment");
+            helper.assertTrue(packagers.stream().allMatch(p -> p.heldBox.isEmpty()), "Busy preflight does not extract products");
+            busy.queuedExitingPackages.clear();
+            LogisticsManager.ACCURATE_SUMMARIES.invalidateAll(); LogisticsManager.SUMMARIES.invalidateAll();
+        });
+        helper.runAtTickTime(140, () -> {
+            helper.assertTrue(order.state == State.SHIPPED && order.packaged == 1200, "All requested products are packaged");
+            int packed = packagers.stream().mapToInt(p -> packagedCount(helper, p, "Large order", Items.OAK_PLANKS)).sum();
+            helper.assertTrue(packed == 1200 && packagers.stream().allMatch(p -> !p.heldBox.isEmpty()),
+                    "Multiple real Packagers produce multiple addressed boxes");
+            int stored = 0;
+            for (ChestBlockEntity chest : chests) for (int slot = 0; slot < chest.getContainerSize(); slot++) stored += chest.getItem(slot).getCount();
+            helper.assertTrue(stored == 208, "Only the requested count was removed across physical inventories");
+            helper.assertTrue(!service.engine.orders.contains(order), "Fully packaged order is removed");
+            helper.succeed();
         });
     }
     @GameTest(template = "empty", batch = "demand")
@@ -260,8 +352,8 @@ public final class DemandRuntimeTests {
         UUID root = UUID.randomUUID(), owner = UUID.randomUUID(), network = UUID.randomUUID();
         Key output = new Key(network, "output"), raw = new Key(network, "raw");
         Recipe r = new Recipe(root, output, 4, Mode.ORDERS, List.of(new Input(UUID.randomUUID(), raw, 1)), "test");
-        Order o = new Order(UUID.randomUUID(), owner, root, 4, Map.of(root, r));
-        o.sent = 4; o.state = State.RETURNING;
+        Order o = new Order(UUID.randomUUID(), owner, root, 4, Map.of(root, r), "Saved destination");
+        o.sent = 4; o.state = State.RETURNING; o.packaged = 2;
         service.engine.orders.add(o); service.engine.pending.add(new Pending(o.id, root, output, 4));
         CompoundTag saved = service.save(new CompoundTag());
         DemandService restored = DemandService.load(saved);
@@ -269,6 +361,15 @@ public final class DemandRuntimeTests {
         helper.assertTrue(copy.sent == 4 && copy.received == 0 && copy.owner.equals(owner) && copy.state == State.RETURNING,
                 "A normal reload preserves owner, dispatched work and waiting state");
         helper.assertTrue(restored.engine.pending.stream().anyMatch(p -> p.order.equals(o.id) && p.remaining == 4), "In-flight production is persisted");
+        helper.assertTrue(copy.address.equals("Saved destination") && copy.packaged == 2,
+                "Queue persistence retains the immutable destination and packaging progress");
+        CompoundTag old = saved.copy();
+        CompoundTag oldOrder = old.getList("Orders", 10).stream().map(v -> (CompoundTag) v)
+                .filter(v -> v.getUUID("Id").equals(o.id)).findFirst().orElseThrow();
+        oldOrder.remove("Address"); oldOrder.remove("Packaged");
+        DemandService oldData = DemandService.load(old);
+        Order oldCopy = oldData.engine.orders.stream().filter(a -> a.id.equals(o.id)).findFirst().orElseThrow();
+        helper.assertTrue(oldCopy.address.isEmpty() && oldCopy.packaged == 0, "Old saves remain unaddressed");
         o.dispatching = true;
         saved = service.save(new CompoundTag());
         restored = DemandService.load(saved);
@@ -388,6 +489,17 @@ public final class DemandRuntimeTests {
         f.service.openSession(f.player, f.ticker);
         helper.assertTrue(f.service.snapshot(f.player, f.ticker).getList("Highlights", 10).isEmpty(), "Pending batch surplus does not repeat a consumed completion notice");
         f.service.engine.arrived(surplus.recipe().output(), 4); f.service.collectFinishedOrders();
+        Order shipped = new Order(UUID.randomUUID(), f.player.getUUID(), surplus.root, 4, surplus.graph, "Elsewhere");
+        shipped.state = State.SHIPPED; shipped.received = shipped.sent = shipped.packaged = 4;
+        f.service.engine.orders.add(shipped);
+        f.service.engine.pending.add(new Pending(shipped.id, shipped.root, shipped.recipe().output(), 1));
+        f.service.collectFinishedOrders();
+        helper.assertTrue(f.service.engine.orders.contains(shipped), "Shipped orders retain accounting until pending surplus returns");
+        f.service.engine.arrived(shipped.recipe().output(), 1); f.service.collectFinishedOrders();
+        helper.assertTrue(!f.service.engine.orders.contains(shipped), "Shipped orders are cleaned after final pending returns");
+        f.player.containerMenu = f.ticker.new RequestMenuProvider().createMenu(7, f.player.getInventory(), f.player);
+        f.service.openSession(f.player, f.ticker);
+        helper.assertTrue(f.service.snapshot(f.player, f.ticker).getList("Highlights", 10).isEmpty(), "Shipped products do not generate stock highlights");
         helper.succeed();
     }
     @GameTest(template = "empty", batch = "demand_feedback")

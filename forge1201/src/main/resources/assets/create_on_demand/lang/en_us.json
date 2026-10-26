@@ -50,5 +50,8 @@
   "gui.create_on_demand.demand.reason.amount_limit": "The quantity requires too many ingredients. Request a smaller batch.",
   "gui.create_on_demand.demand.producer_option": "Producer %s: %s",
   "gui.create_on_demand.demand.producer_select": "Select producer",
-  "gui.create_on_demand.demand.state.completed": "Completed; items returned to the network"
+  "gui.create_on_demand.demand.state.completed": "Completed; items returned to the network",
+  "gui.create_on_demand.demand.packaged": "Packaged: %s / %s",
+  "gui.create_on_demand.demand.reason.shipping_stock": "Waiting for all remaining products in storage",
+  "gui.create_on_demand.demand.reason.shipping_busy": "Waiting for available Packagers"
 }

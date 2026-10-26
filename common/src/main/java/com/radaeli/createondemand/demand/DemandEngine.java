@@ -32,6 +32,8 @@ public final class DemandEngine {
         boolean invalid(UUID gauge);
         /** Must check all inputs and commit a whole batch, or return false without dispatching. */
         boolean dispatch(Recipe recipe);
+        /** Return only the quantity physically extracted into addressed packages. */
+        int ship(Order order, int quantity);
         void dirty();
         default void checkpoint() { dirty(); }
         default void failed(UUID order, RuntimeException error) {}
@@ -39,13 +41,18 @@ public final class DemandEngine {
     public static final class Order {
         public final UUID id, owner, root;
         public final int quantity;
+        public final String address;
         public final LinkedHashMap<UUID, Recipe> graph;
         public State state = State.MATERIALS;
         public String reason = "";
-        public int sent, received;
+        public int sent, received, packaged;
         public boolean dispatching, completionNotified;
         public Order(UUID id, UUID owner, UUID root, int quantity, Map<UUID, Recipe> graph) {
+            this(id, owner, root, quantity, graph, "");
+        }
+        public Order(UUID id, UUID owner, UUID root, int quantity, Map<UUID, Recipe> graph, String address) {
             this.id = id; this.owner = owner; this.root = root; this.quantity = quantity;
+            this.address = Objects.requireNonNull(address);
             this.graph = new LinkedHashMap<>(graph);
         }
         public Recipe recipe() { return graph.get(root); }
@@ -143,12 +150,15 @@ public final class DemandEngine {
         result.merge(recipe.output(), Math.multiplyExact(plan.batches().get(id), recipe.yield()), Math::addExact);
     }
     public Order submit(UUID owner, UUID root, int quantity) {
+        return submit(owner, root, quantity, "");
+    }
+    public Order submit(UUID owner, UUID root, int quantity, String address) {
         Recipe recipe = port.recipes().get(root);
         if (quantity < 1 || quantity > 65536 || recipe == null || recipe.mode() != Mode.ORDERS) throw new IllegalArgumentException("invalid order");
         Map<UUID, Recipe> graph = graph(root, port.recipes());
         Plan plan = plan(root, quantity, graph, port.stock());
         if (!plan.valid()) throw new IllegalArgumentException(plan.error());
-        Order order = new Order(UUID.randomUUID(), owner, root, quantity, graph);
+        Order order = new Order(UUID.randomUUID(), owner, root, quantity, graph, address);
         orders.add(order); port.dirty(); return order;
     }
     public void cancel(Order order) {
@@ -168,7 +178,7 @@ public final class DemandEngine {
     public Map<Key, Integer> freeStock() {
         Map<Key, Integer> free = new HashMap<>(port.stock());
         for (Order o : orders) if (!o.terminal())
-            subtract(free, o.recipe().output(), Math.min(o.quantity, o.received));
+            subtract(free, o.recipe().output(), Math.max(0, Math.min(o.quantity, o.received) - o.packaged));
         return free;
     }
     private static void subtract(Map<Key, Integer> stock, Key key, int quantity) {
@@ -184,6 +194,10 @@ public final class DemandEngine {
         }
         for (Order o : orders) {
             if (o.terminal() || o.state == State.SUSPENDED) continue;
+            if (o.received >= o.quantity) {
+                finish(o);
+                continue;
+            }
             boolean unavailable = false;
             for (Recipe r : o.graph.values()) {
                 Recipe live = port.recipes().get(r.id());
@@ -194,11 +208,6 @@ public final class DemandEngine {
                 if (!port.loaded(r.id())) { o.reason = "unloaded"; unavailable = true; }
             }
             if (unavailable) continue;
-            if (o.received >= o.quantity) {
-                // Arrival is the acknowledgement. The factory's own return route owns delivery.
-                o.state = State.COMPLETED; o.reason = ""; port.dirty();
-                continue;
-            }
             int needed = Math.max(0, o.quantity - o.sent);
             if (needed == 0) { o.state = State.RETURNING; o.reason = ""; continue; }
             Plan plan = plan(o.root, needed, o.graph, forecast);
@@ -233,4 +242,35 @@ public final class DemandEngine {
             }
         }
     }
+    private void finish(Order order) {
+        if (order.address.isBlank()) {
+            order.state = State.COMPLETED; order.reason = ""; port.dirty(); return;
+        }
+        order.state = State.SHIPPING; order.reason = ""; port.dirty();
+        int remaining = order.quantity - order.packaged;
+        if (remaining == 0) { order.state = State.SHIPPED; return; }
+        // Earlier orders retain first claim even if their Packagers cannot send this tick.
+        int available = port.stock().getOrDefault(order.recipe().output(), 0);
+        for (Order earlier : orders) {
+            if (earlier == order) break;
+            if (!earlier.terminal() && earlier.recipe().output().equals(order.recipe().output()))
+                available -= Math.max(0, Math.min(earlier.quantity, earlier.received) - earlier.packaged);
+        }
+        if (available < remaining) { order.reason = "shipping_stock"; return; }
+        order.dispatching = true;
+        try {
+            port.checkpoint();
+            int packed = port.ship(order, remaining);
+            if (packed < 0 || packed > remaining) throw new IllegalStateException("invalid shipping acknowledgement");
+            order.packaged += packed;
+            order.dispatching = false;
+            if (order.packaged == order.quantity) order.state = State.SHIPPED;
+            else order.reason = "shipping_busy";
+            port.checkpoint();
+        } catch (RuntimeException error) {
+            order.dispatching = true; order.state = State.SUSPENDED; order.reason = "dispatch_uncertain";
+            port.failed(order.id, error); port.dirty();
+        }
+    }
+
 }

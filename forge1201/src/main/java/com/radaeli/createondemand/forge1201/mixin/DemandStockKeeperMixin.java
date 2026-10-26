@@ -35,7 +35,7 @@ public abstract class DemandStockKeeperMixin extends AbstractSimiContainerScreen
     @Override public DemandPanel demandPanel() { return onDemand$panel; }
     @Inject(method = "init", remap = true, at = @At("TAIL"))
     private void onDemand$init(CallbackInfo ci) {
-        onDemand$panel = new DemandPanel((Screen) (Object) this, blockEntity, () -> refreshSearchNextTick = true);
+        onDemand$panel = new DemandPanel((Screen) (Object) this, blockEntity, () -> refreshSearchNextTick = true, () -> addressBox.getValue());
         IconButton view = new IconButton(getGuiLeft() + windowWidth + 3, getGuiTop() + 18, DemandIcons.view(onDemand$panel.view));
         view.setToolTip(onDemand$panel.viewName()); view.withCallback(() -> { onDemand$panel.cycleView(); view.setIcon(DemandIcons.view(onDemand$panel.view)); view.setToolTip(onDemand$panel.viewName()); }); addRenderableWidget(view);
         IconButton orders = new IconButton(getGuiLeft() + windowWidth + 3, getGuiTop() + 40, AllIcons.I_SCROLL);

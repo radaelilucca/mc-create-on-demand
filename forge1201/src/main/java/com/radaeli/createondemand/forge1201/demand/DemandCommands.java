@@ -44,7 +44,9 @@ public final class DemandCommands {
                     for (Input i : recipe.inputs()) if (!com.simibubi.create.Create.LOGISTICS.mayInteract(i.key().network(), player)) throw new IllegalArgumentException("network_access");
                 if (action.equals("submit")) {
                     if (service.engine.orders.stream().filter(o -> !o.terminal()).count() >= 256) throw new IllegalArgumentException("queue_full");
-                    service.engine.submit(player.getUUID(), root, quantity);
+                    String address = request.getString("Address");
+                    if (address.length() > 1024) throw new IllegalArgumentException("invalid_order");
+                    service.engine.submit(player.getUUID(), root, quantity, address);
                     response = service.snapshot(player, ticker); response.putBoolean("Accepted", true);
                 } else {
                     response = service.snapshot(player, ticker); response.put("Preview", service.preview(root, quantity));

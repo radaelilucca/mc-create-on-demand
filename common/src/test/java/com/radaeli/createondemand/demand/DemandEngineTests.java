@@ -17,7 +17,8 @@ public final class DemandEngineTests {
         final Map<UUID, Recipe> recipes = new HashMap<>();
         final List<Recipe> dispatched = new ArrayList<>();
         final Set<UUID> unloaded = new HashSet<>();
-        int checkpoints, failCheckpointAt = -1;
+        int checkpoints, failCheckpointAt = -1, shippingLimit = Integer.MAX_VALUE, shipped;
+        final Set<UUID> blockedShipments = new HashSet<>();
         DemandEngine engine = new DemandEngine(this);
         World() {
             recipes.put(PLANK, recipe(PLANK, PLANK_KEY, 4, new Input(LOG, LOG_KEY, 1)));
@@ -34,6 +35,12 @@ public final class DemandEngineTests {
             Map<Key, Integer> total = new HashMap<>(); for (Input i : r.inputs()) total.merge(i.key(), i.amount(), Integer::sum);
             check(total.entrySet().stream().allMatch(e -> stock.getOrDefault(e.getKey(), 0) >= e.getValue()), "No virtual ingredients");
             total.forEach((k, v) -> stock.merge(k, -v, Integer::sum)); dispatched.add(r); return true;
+        }
+        public int ship(Order order, int quantity) {
+            if (blockedShipments.contains(order.id)) return 0;
+            int count = Math.min(quantity, shippingLimit);
+            stock.merge(order.recipe().output(), -count, Integer::sum); shipped += count;
+            return count;
         }
         void returns() {
             for (Recipe r : List.copyOf(dispatched)) { stock.merge(r.output(), r.yield(), Integer::sum); engine.arrived(r.output(), r.yield()); }
@@ -157,6 +164,49 @@ public final class DemandEngineTests {
                 "A journal failure after dispatch suspends the order with its intent preserved");
         check(interrupted.dispatched.size() == 1 && interrupted.engine.pending.size() == 1,
                 "An uncertain dispatch is never repeated automatically");
+        shippingScenarios();
         System.out.println("DemandEngine: all behavioral scenarios passed");
     }
+    private static void shippingScenarios() {
+        World w = new World(); w.stock.put(LOG_KEY, 2); w.shippingLimit = 2;
+        Order o = w.engine.submit(OWNER, PLANK, 5, "Home");
+        w.engine.tick(); w.returns(); w.engine.tick();
+        check(o.received == 4 && w.shipped == 0, "No shipping before the whole requested quantity returns");
+        w.returns(); w.engine.tick();
+        check(o.state == State.SHIPPING && o.packaged == 2 && o.address.equals("Home"), "Destination is retained while a partial shipment waits");
+        check(w.engine.freeStock().get(PLANK_KEY) == 3, "Only the unshipped requested output stays reserved");
+        w.engine.tick(); w.engine.tick(); w.engine.tick();
+        check(o.state == State.SHIPPED && o.packaged == 5 && w.shipped == 5 && w.stock.get(PLANK_KEY) == 3,
+                "Shipping retries only the remainder and leaves batch surplus");
+        check(w.dispatched.isEmpty() && o.sent == 8, "Shipping does not create more production batches");
+
+        World cancelled = new World(); cancelled.stock.put(LOG_KEY, 1); cancelled.shippingLimit = 1;
+        Order partial = cancelled.engine.submit(OWNER, PLANK, 4, "Home");
+        cancelled.engine.tick(); cancelled.returns(); cancelled.engine.tick();
+        cancelled.engine.cancel(partial); cancelled.engine.tick();
+        check(partial.state == State.CANCELLED && cancelled.shipped == 1 && cancelled.stock.get(PLANK_KEY) == 3,
+                "Cancellation stops the remaining shipment without recalling made packages");
+
+        World fifo = new World(); fifo.stock.put(PLANK_KEY, 4);
+        Order first = fifo.engine.submit(OWNER, PLANK, 4, "First"), second = fifo.engine.submit(OWNER, PLANK, 4, "Second");
+        first.received = first.sent = second.received = second.sent = 4;
+        fifo.blockedShipments.add(first.id); fifo.engine.tick();
+        check(first.state == State.SHIPPING && second.packaged == 0 && second.reason.equals("shipping_stock"),
+                "A later shipment cannot consume the earlier order's reserved products");
+        fifo.blockedShipments.clear(); fifo.engine.tick();
+        check(first.state == State.SHIPPED && second.packaged == 0, "Shared stock cannot fund two shipments");
+        fifo.stock.put(PLANK_KEY, 4); fifo.engine.tick();
+        check(second.state == State.SHIPPED && fifo.shipped == 8, "A waiting shipment resumes after stock returns");
+
+        World uncertain = new World(); uncertain.stock.put(PLANK_KEY, 4); uncertain.failCheckpointAt = 2;
+        Order interrupted = uncertain.engine.submit(OWNER, PLANK, 4, "Home"); interrupted.received = interrupted.sent = 4;
+        uncertain.engine.tick(); uncertain.engine.tick();
+        check(interrupted.state == State.SUSPENDED && interrupted.dispatching && uncertain.shipped == 4,
+                "An uncertain shipment is suspended and never sent again automatically");
+        World before = new World(); before.stock.put(PLANK_KEY, 4); before.failCheckpointAt = 1;
+        Order notSent = before.engine.submit(OWNER, PLANK, 4, "Home"); notSent.received = notSent.sent = 4;
+        before.engine.tick();
+        check(notSent.state == State.SUSPENDED && before.shipped == 0, "A failed intent checkpoint prevents physical shipping");
+    }
+
 }

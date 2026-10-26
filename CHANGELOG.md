@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0] - 2026-10-25
+
+### Added
+
+- Package completed orders for the address saved from the Stock Keeper, sending exactly the requested quantity and keeping surplus in storage.
+- Track the saved destination and packaging progress in the orders panel.
+
 ## [0.0.1] - 2026-10-21
 
 ### Added

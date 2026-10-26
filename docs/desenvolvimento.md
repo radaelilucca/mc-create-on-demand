@@ -67,3 +67,27 @@ A revisão visual das listas **Items to craft** e **Missing materials**, incluin
 `buildAll --offline` aprovado com os testes do núcleo nos dois JDKs. Log: `build/release-0.0.1-build.log`. Os JARs em `forge1201/build/libs` e `neoforge/build/libs` foram conferidos quanto a nome, versão nos metadados, licença empacotada e ausência de classes de teste; hashes em `build/release-0.0.1-artifacts.json`.
 
 Os 11 GameTests de cada loader passaram antes desta alteração de versão, conforme a evidência da seção anterior; não foram repetidos para a mudança de metadados e documentação. A revisão visual permanece pendente. Esta pasta não tem repositório Git inicializado; nenhum commit, tag, push ou publicação foi realizado.
+
+
+## Empacotamento com endereço - 25/10/2026
+
+Pedidos capturam o campo de endereço ao confirmar. Após o retorno completo, empacotam exatamente a quantidade solicitada e preservam sobras no estoque. Pedidos sem endereço continuam concluindo no estoque. O painel mostra destino e quantidade empacotada; cancelamento interrompe somente o trabalho restante.
+
+`buildAll runNeoForgeGameTests runForgeGameTests -PdemandGameTests --offline --console=plain` passou sequencialmente: cenários compartilhados nos JDKs 17 e 21 e **14 GameTests por loader**. Evidência em `build/addressed-shipping-final-validation.log`. Os testes verificam fabricação física com envio de cinco produtos e sobra de três, cadeia com envio somente do produto final, 1.200 itens em múltiplas caixas e Packagers, espera por disponibilidade, bloqueio por Packager ocupado, persistência, compatibilidade de pedidos antigos e ausência de destaque para produtos enviados. O núcleo cobre também envio parcial com retomada, reservas concorrentes, cancelamento e intenção interrompida.
+
+O build final, incluindo os testes compartilhados nos dois JDKs, foi repetido após os ajustes de tradução e do limite de grupos; log em `build/addressed-shipping-build.log`. Os GameTests não foram repetidos depois desse limite, que não altera as quantidades dos cenários de até 1.200 itens já verificados.
+
+Cada grupo de envio final limita seu tamanho a no máximo 64 caixas para ficar abaixo do limite nativo de 100 tentativas por Packager; o restante continua no pedido. O progresso usa os contadores reais das solicitações do Create. Reservas do On Demand não impedem retiradas externas. Dados do pedido e chunks continuam sem transação atômica: despachos interrompidos ficam suspensos para revisão.
+
+Os testes práticos e a revisão visual ficaram com o usuário. Um único cliente NeoForge foi iniciado em `build/shipping-client`, usando uma cópia do mundo de GameTests; o mundo pessoal em `neoforge/runs/client/saves/New World` não foi aberto. A inspeção visual automatizada não foi concluída. Log de inicialização em `build/addressed-shipping-client.log`.
+
+Roteiro manual: preencher o endereço antes de confirmar, verificar destino e progresso em Pedidos, editar o campo e conferir que o pedido anterior conserva seu destino, aguardar retorno parcial sem envio, conferir endereço e contagem em todas as caixas e preservar as sobras. Repetir sem endereço, com Packager ocupado, após reinício e com cancelamento durante o empacotamento. Conferir textos em inglês e português, nomes longos e escalas de GUI. A chegada ao destino depende do transporte existente; terminar o pedido confirma empacotamento, não entrega física.
+
+Versão mantida em `0.0.1`; nenhum commit, tag ou publicação.
+
+
+## Versão 0.1.0 - 25/10/2026
+
+Versão atualizada para `0.1.0`, com changelog do empacotamento para o endereço salvo no Stock Keeper e acompanhamento de destino e progresso. `buildAll --offline --console=plain` passou com os testes compartilhados nos dois JDKs; log em `build/release-0.1.0-build.log`. Os dois JARs foram conferidos quanto à versão nos metadados, traduções UTF-8, licença e ausência de classes de GameTests; hashes em `build/release-0.1.0-artifacts.json`.
+
+Os GameTests não foram repetidos para a alteração de versão; as evidências e limites da validação da feature estão na seção anterior. Testes práticos continuam com o usuário. Preparação local, sem tag, push ou publicação.

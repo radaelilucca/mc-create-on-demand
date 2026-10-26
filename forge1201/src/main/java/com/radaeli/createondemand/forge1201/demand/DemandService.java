@@ -228,6 +228,27 @@ public final class DemandService extends SavedData implements DemandEngine.Port 
         lastDispatch.put(recipe.id(), (long) server.getTickCount());
         return true;
     }
+    @Override public int ship(Order order, int quantity) {
+        UUID network = order.recipe().output().network();
+        ItemStack item = stack(order.recipe().output());
+        // Native dispatch stops after 100 boxes per Packager. Bound each group to at most
+        // 64 boxes so large orders do not leave an unfinished native package group behind.
+        int batchQuantity = (int) Math.min(quantity, item.getItem().canFitInsideContainerItems()
+                ? 64L * 9 * item.getMaxStackSize() : 64L);
+        List<BigItemStack> expected = List.of(new BigItemStack(item, batchQuantity));
+        PackageOrderWithCrafts context = new PackageOrderWithCrafts(new PackageOrder(expected), List.of());
+        Multimap<PackagerBlockEntity, PackagingRequest> requests =
+                LogisticsManager.findPackagersForRequest(network, context, null, order.address);
+        if (!complete(expected, requests)
+                || requests.keySet().stream().anyMatch(p -> p.isTooBusyFor(RequestType.PLAYER))
+                || !physicalInputsAvailable(List.of(requests))) return 0;
+        // Create mutates the counts of these same request objects as packages are made.
+        LogisticsManager.performPackageRequests(requests);
+        int remaining = requests.values().stream().mapToInt(PackagingRequest::getCount).sum();
+        LogisticsManager.ACCURATE_SUMMARIES.invalidateAll();
+        LogisticsManager.SUMMARIES.invalidateAll();
+        return batchQuantity - remaining;
+    }
     /** Different networks can expose the same physical inventory. Preflight their combined withdrawals. */
     private static boolean physicalInputsAvailable(List<Multimap<PackagerBlockEntity, PackagingRequest>> batches) {
         Map<Object, List<PackagingRequest>> groups = new HashMap<>();
@@ -327,7 +348,7 @@ public final class DemandService extends SavedData implements DemandEngine.Port 
     }
     public static CompoundTag orderTag(Order o) {
         CompoundTag t = new CompoundTag(); t.putUUID("Id", o.id); t.putUUID("Owner", o.owner); t.putUUID("Root", o.root);
-        t.putInt("Quantity", o.quantity);
+        t.putInt("Quantity", o.quantity); t.putString("Address", o.address); t.putInt("Packaged", o.packaged);
         t.putString("State", o.state.name()); t.putString("Reason", o.reason); t.putInt("Sent", o.sent); t.putInt("Received", o.received);
         t.putBoolean("Dispatching", o.dispatching); t.putBoolean("CompletionNotified", o.completionNotified);
         ListTag graph = new ListTag(); o.graph.values().forEach(r -> graph.add(recipeTag(r))); t.put("Graph", graph); return t;
@@ -336,7 +357,8 @@ public final class DemandService extends SavedData implements DemandEngine.Port 
         Map<UUID, Recipe> graph = new LinkedHashMap<>(); for (Tag v : t.getList("Graph", Tag.TAG_COMPOUND)) {
             Recipe r = readRecipe((CompoundTag) v); graph.put(r.id(), r);
         }
-        Order o = new Order(t.getUUID("Id"), t.getUUID("Owner"), t.getUUID("Root"), t.getInt("Quantity"), graph);
+        Order o = new Order(t.getUUID("Id"), t.getUUID("Owner"), t.getUUID("Root"), t.getInt("Quantity"), graph, t.getString("Address"));
+        o.packaged = t.getInt("Packaged");
         o.completionNotified = t.getBoolean("CompletionNotified");
         o.state = State.valueOf(t.getString("State")); o.reason = t.getString("Reason"); o.sent = t.getInt("Sent"); o.received = t.getInt("Received");
         // A removed producer mode requires review; never silently resume its old chain.
@@ -347,7 +369,7 @@ public final class DemandService extends SavedData implements DemandEngine.Port 
         if (t.getBoolean("Shipping") || t.getBoolean("Dispatching")) { o.state = State.SUSPENDED; o.reason = "dispatch_uncertain"; } return o;
     }
     @Override public CompoundTag save(CompoundTag tag) {
-        tag.putInt("Version", 4); ListTag rs = new ListTag(), os = new ListTag(), ps = new ListTag();
+        tag.putInt("Version", 5); ListTag rs = new ListTag(), os = new ListTag(), ps = new ListTag();
         refs.forEach((id, ref) -> {
             CompoundTag t = new CompoundTag(); t.putUUID("Id", id); t.putString("Dimension", ref.dimension); t.putLong("Pos", ref.pos); t.putString("Slot", ref.slot);
             if (recipes.containsKey(id)) t.put("Recipe", recipeTag(recipes.get(id))); rs.add(t);
@@ -376,7 +398,7 @@ public final class DemandService extends SavedData implements DemandEngine.Port 
             CompoundTag notice = (CompoundTag) v;
             data.unseen.computeIfAbsent(notice.getUUID("Owner"), owner -> new LinkedHashSet<>()).add(readKey(notice));
         }
-        if (tag.getInt("Version") < 4) data.setDirty();
+        if (tag.getInt("Version") < 5) data.setDirty();
         return data;
     }
 }

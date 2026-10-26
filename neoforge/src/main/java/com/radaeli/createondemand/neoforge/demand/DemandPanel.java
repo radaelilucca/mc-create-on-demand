@@ -26,6 +26,7 @@ public final class DemandPanel {
     private final Screen host;
     private final StockTickerBlockEntity ticker;
     private final Runnable refresh;
+    private final java.util.function.Supplier<String> address;
     private final List<AbstractWidget> widgets = new ArrayList<>();
     private CompoundTag snapshot = new CompoundTag(), preview = new CompoundTag();
     private final List<CompoundTag> catalog = new ArrayList<>();
@@ -49,8 +50,8 @@ public final class DemandPanel {
     private record ContentRow(Component label, ItemStack item) {
         ContentRow(Component label) { this(label, ItemStack.EMPTY); }
     }
-    public DemandPanel(Screen host, StockTickerBlockEntity ticker, Runnable refresh) {
-        this.host = host; this.ticker = ticker; this.refresh = refresh;
+    public DemandPanel(Screen host, StockTickerBlockEntity ticker, Runnable refresh, java.util.function.Supplier<String> address) {
+        this.host = host; this.ticker = ticker; this.refresh = refresh; this.address = address;
         send("open", new CompoundTag());
     }
     public static Component text(String key, Object... values) { return Component.translatable("gui.create_on_demand.demand." + key, values); }
@@ -138,7 +139,8 @@ public final class DemandPanel {
         button(x + 22, footerY(), AllIcons.I_CONFIG_BACK, "back", this::close);
         submit = button(x + FRAME.getWidth() - 42, footerY(), AllIcons.I_CONFIRM, "submit", () -> {
             if (!ready()) return;
-            send("submit", selection());
+            CompoundTag request = selection(); request.putString("Address", address.get());
+            send("submit", request);
             previewQuantity = 0; submit.active = false;
         });
         requestPreview();
@@ -248,6 +250,10 @@ public final class DemandPanel {
                 }
                 lines.add(new ContentRow(text("progress", order.getInt("Received"), order.getInt("Quantity"), order.getInt("Sent"))));
                 lines.add(new ContentRow(text("state." + order.getString("State").toLowerCase(Locale.ROOT))));
+                if (!order.getString("Address").isBlank()) {
+                    lines.add(new ContentRow(text("destination", order.getString("Address"))));
+                    lines.add(new ContentRow(text("packaged", order.getInt("Packaged"), order.getInt("Quantity"))));
+                }
                 if (!order.getString("Reason").isEmpty()) lines.add(new ContentRow(text("reason." + order.getString("Reason"))));
                 lines.add(new ContentRow(text("order_number", orderSelection + 1, snapshot.getList("Orders", Tag.TAG_COMPOUND).size())));
             }

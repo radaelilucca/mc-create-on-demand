@@ -50,5 +50,8 @@
   "gui.create_on_demand.demand.reason.amount_limit": "A quantidade exige ingredientes demais. Solicite um lote menor.",
   "gui.create_on_demand.demand.producer_option": "Produtor %s: %s",
   "gui.create_on_demand.demand.producer_select": "Selecionar produtor",
-  "gui.create_on_demand.demand.state.completed": "Concluído; itens retornaram à rede"
+  "gui.create_on_demand.demand.state.completed": "Concluído; itens retornaram à rede",
+  "gui.create_on_demand.demand.packaged": "Empacotados: %s / %s",
+  "gui.create_on_demand.demand.reason.shipping_stock": "Aguardando todos os produtos restantes no estoque",
+  "gui.create_on_demand.demand.reason.shipping_busy": "Aguardando empacotadores disponíveis"
 }
