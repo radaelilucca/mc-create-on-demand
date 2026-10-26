@@ -2,7 +2,7 @@
 
 <p align="center" style="text-align: center;">An addon for <b>Create</b></p>
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/what_it_is.png" alt="WHAT IT IS?" width="334"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/what_it_is.png" alt="WHAT IT IS?" width="267"></p>
 
 You built a great Create factory, but it only makes things when a Factory Gauge's stock
 runs low. Need 16 of something right now? You end up changing a slider and waiting for the
@@ -16,7 +16,7 @@ your Factory Gauges.
 There are no new blocks, items or recipes to learn. It works with the Stock Keeper and
 Factory Gauges you already have.
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/what_can_it_do.png" alt="WHAT CAN IT DO?" width="468"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/what_can_it_do.png" alt="WHAT CAN IT DO?" width="375"></p>
 
 Three things: **ordering**, **tracking** and **delivery**.
 
@@ -56,7 +56,7 @@ progress.
 
 ---
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/how-do-i-use-it.png" alt="HOW DO I USE IT?" width="463"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/how-do-i-use-it.png" alt="HOW DO I USE IT?" width="371"></p>
 
 1. **Set up your gauges.** Configure recipes on your Factory Gauges and connect their
    ingredient gauges. New gauges use **Maintain stock and accept orders** by default.
@@ -84,7 +84,7 @@ chunks. Cancelling stops new work but doesn't recover ingredients already sent o
 
 ---
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/requirements.png" alt="REQUIREMENTS" width="444"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/requirements.png" alt="REQUIREMENTS" width="355"></p>
 
 - **Minecraft 1.21.1** with **NeoForge 21.1.236** or newer, and **Create** 6.0.10
 - **Minecraft 1.20.1** with **Forge 47.4.0**, and **Create** 6.0.8
@@ -93,12 +93,12 @@ Install the matching JAR alongside Create on **both the client and the server**.
 
 ---
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/found_a_bug.png" alt="FOUND A BUG? HAVE AN IDEA?" width="799"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/found_a_bug.png" alt="FOUND A BUG? HAVE AN IDEA?" width="639"></p>
 
 Open an issue and include your Minecraft version, the mod versions and a description of
 what happened. A screenshot of your Factory Gauge setup helps a lot.
 
-<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/can_i_use.png" alt="CAN I USE THIS IN A MODPACK?" width="848"></p>
+<p align="center" style="background-color: #F4ECD0; text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/section-titles/can_i_use.png" alt="CAN I USE THIS IN A MODPACK?" width="679"></p>
 
 **Yes, go ahead!** Create: On Demand is released under the **AGPL-3.0 License**. A link
 back to this page is appreciated.
