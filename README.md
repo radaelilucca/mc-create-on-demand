@@ -1,4 +1,4 @@
-<p align="center" style="text-align: center;"><img src="https://raw.githubusercontent.com/radaelilucca/mc-create-on-demand/main/docs/gallery/order-sheet.png" alt="Create: On Demand" width="160"></p>
+<p align="center" style="text-align: center;"><img src="https://media.forgecdn.net/avatars/thumbnails/2138/631/256/256/639282302111015240.png" alt="Create: On Demand" width="160"></p>
 
 <p align="center" style="text-align: center;">An addon for <b>Create</b></p>
 
